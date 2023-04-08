@@ -16,10 +16,11 @@ import time
 import random
 import uuid
 import re
+import traceback
 
 # variables to hold host, port numbers
 HOST = ""
-ROB = "silicon.cs.umanitoba.ca"
+WELL_KNOWN_PEERS = ["silicon.cs.umanitoba.ca","eagle.cs.umanitoba.ca"];
 PEER_NETWORK_PORT = 16000
 MY_PORT = 8396
 # set up the socket for the clients
@@ -29,10 +30,14 @@ lastGossipTime = 0;
 hostname=socket.gethostname()
 IPAddr=socket.gethostbyname(hostname)
 
-peerSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-mySocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-mySocket.bind((HOST, 8396))
+wellKnownPeerSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+peerSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+peerSocket.bind((HOST, 8396))
+peerSocket.setblocking(0)
+
+inputs = [peerSocket]
+outputs = []
 # --------------------------------------------------------------------------
 # gossip()
 #
@@ -45,8 +50,8 @@ def gossip():
 #	print('new time: '+str(lastGossipTime))
 	theMessage = json.dumps({"command": "GOSSIP", "host":IPAddr, "port": 8396, "name":"potato", "messageID": str(uuid.uuid4())})
 	print(theMessage)
-	peerSocket.sendto(theMessage.encode('utf-8'),(ROB, PEER_NETWORK_PORT)) # udp message	
-
+	wellKnownPeerSocket.sendto(theMessage.encode('utf-8'),(WELL_KNOWN_PEERS[0], PEER_NETWORK_PORT)) # udp message	
+	wellKnownPeerSocket.sendto(theMessage.encode('utf-8'),(WELL_KNOWN_PEERS[1], PEER_NETWORK_PORT)) # udp message	
 
 # --------------------------------------------------------------------------
 # parseMessage(message)
@@ -63,20 +68,28 @@ def main():
 	
 	while True:
 		try:
-			# gossip every minute.. implmented this way for now. Rob suggests using the timeout in the select statement (which I don't have yet)
-			if(time.time()-lastGossipTime >= 60):  	
-				gossip()
-				
-			# check the socket for the peers and handle the messages
-			data = mySocket.recvfrom(1024)
-			if(data):
-				parseMessage(data)
+			timeout = 60
 
+			readable, writable, exceptional = select.select(inputs, outputs, inputs, timeout)
+			
+			for s in readable:
+				if s is peerSocket:
+					# check the socket for the peers and handle the messages
+					data = s.recvfrom(1024)
+					if(data):
+						parseMessage(data)
+					
+			if not (readable or writable or exceptional):
+				# timed out, so gossip
+				gossip()
+				continue 
+		
 		except KeyboardInterrupt as e:
 			print("End of processing.")
 			sys.exit(0)
 		except Exception as e:
 			print(e)
+			traceback.print_exc()
 			print("End of processing.")
 			peerSocket.close()
 			sys.exit(0)
