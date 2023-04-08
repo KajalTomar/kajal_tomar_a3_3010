@@ -17,6 +17,7 @@ import random
 import uuid
 import re
 import traceback
+from classes.peer import Peer
 
 # variables to hold host, port numbers
 HOST = ""
@@ -24,8 +25,6 @@ WELL_KNOWN_PEERS = ["silicon.cs.umanitoba.ca","eagle.cs.umanitoba.ca"];
 PEER_NETWORK_PORT = 16000
 MY_PORT = 8396
 # set up the socket for the clients
-
-lastGossipTime = 0;
 
 hostname=socket.gethostname()
 IPAddr=socket.gethostbyname(hostname)
@@ -38,16 +37,26 @@ peerSocket.setblocking(0)
 
 inputs = [peerSocket]
 outputs = []
+exceptions = []
+
+myPeers = []
+# --------------------------------------------------------------------------
+# calcTimeout()
+#
+# Purpose: calculates the timeout based on the current nearest due date
+# Returns: the timeout
+# --------------------------------------------------------------------------
+def calcTimeout():
+	timeout = 60;
+	# timeout = closestDueDate - time.time() (current time)
+	return timeout;
+
 # --------------------------------------------------------------------------
 # gossip()
 #
 # Purpose: sends a GOSSIP message to enter, and stay active in the network
 # --------------------------------------------------------------------------
 def gossip():
-	global lastGossipTime
-#	print('old time: '+str(lastGossipTime))
-	lastGossipTime = time.time()
-#	print('new time: '+str(lastGossipTime))
 	theMessage = json.dumps({"command": "GOSSIP", "host":IPAddr, "port": 8396, "name":"potato", "messageID": str(uuid.uuid4())})
 	print(theMessage)
 	wellKnownPeerSocket.sendto(theMessage.encode('utf-8'),(WELL_KNOWN_PEERS[0], PEER_NETWORK_PORT)) # udp message	
@@ -60,25 +69,33 @@ def gossip():
 # Parameter: the message
 # --------------------------------------------------------------------------
 def parseMessage(message):
-	message = message[0].decode('utf-8') ## note message[2] has the address of the sender
-	print(message)
+	message = message.decode('utf-8') ## note message[2] has the address of the sender
+	message = json.loads(message)
+
+	# ignore invalid messages (all valid messages have a command key)
+	if("command" in message):
+		print(message["command"])
+	
 
 def main():
-	global lastGossipTime
-	
+	# first time announcement
+	gossip()
+
 	while True:
 		try:
-			timeout = 60
-
-			readable, writable, exceptional = select.select(inputs, outputs, inputs, timeout)
+			readable, writable, exceptional = select.select(inputs, outputs, exceptions, calcTimeout())
 			
 			for s in readable:
 				if s is peerSocket:
 					# check the socket for the peers and handle the messages
-					data = s.recvfrom(1024)
+					data = s.recv(1024)
 					if(data):
 						parseMessage(data)
-					
+			
+				for s in exceptions:
+					print('closing socket for '+s.getpeername()+' due to an exception.')
+					s.close()
+
 			if not (readable or writable or exceptional):
 				# timed out, so gossip
 				gossip()
