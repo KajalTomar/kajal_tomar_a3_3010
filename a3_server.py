@@ -68,14 +68,33 @@ def gossip():
 # Purpose: parse the message sent by a peer in the network
 # Parameter: the message
 # --------------------------------------------------------------------------
-def parseMessage(message):
+def parseMessage(message, heardAt):
 	message = message.decode('utf-8') ## note message[2] has the address of the sender
 	message = json.loads(message)
 
 	# ignore invalid messages (all valid messages have a command key)
 	if("command" in message):
-		print(message["command"])
-	
+		if(message["command"] == "GOSSIP_REPLY"):
+			gossipReplyHeard(message, heardAt)
+
+# --------------------------------------------------------------------------
+# gossipReplyHeard()
+#
+# Purpose: a peer sent a gossip_reply. If they aren't in the peer list,
+#	then add them to it
+# Parameter: the message, time it was recieved
+# --------------------------------------------------------------------------
+def gossipReplyHeard(message, heardAt):
+	print(message)
+	print(heardAt)
+
+	if(("host" in message) and ("port" in message) and ("name" in message)):
+		# the message is valid
+		myPeers.append(Peer(message["host"],message["port"],message["name"]))
+
+def printAllPeers():
+	for aPeer in myPeers:
+		print(aPeer)
 
 def main():
 	# first time announcement
@@ -90,7 +109,7 @@ def main():
 					# check the socket for the peers and handle the messages
 					data = s.recv(1024)
 					if(data):
-						parseMessage(data)
+						parseMessage(data, time.time())
 			
 				for s in exceptions:
 					print('closing socket for '+s.getpeername()+' due to an exception.')
@@ -101,6 +120,7 @@ def main():
 				gossip()
 				continue 
 		
+			printAllPeers()
 		except KeyboardInterrupt as e:
 			print("End of processing.")
 			sys.exit(0)

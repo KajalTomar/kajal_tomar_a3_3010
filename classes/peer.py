@@ -10,8 +10,8 @@ class Peer:
 
 	# so I can print the peer's information
 	def __str__(self):
-		 return json.dumps({"host":host, 
-				 "port": port, 
-				 "name":name})
+		 return json.dumps({"host":self.host, 
+				 "port": self.port, 
+				 "name":self.name})
 	
 	
