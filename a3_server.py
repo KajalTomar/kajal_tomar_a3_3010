@@ -23,7 +23,8 @@ from classes.peer import Peer
 HOST = ""
 WELL_KNOWN_PEERS = ["silicon.cs.umanitoba.ca","eagle.cs.umanitoba.ca"];
 PEER_NETWORK_PORT = 16000
-MY_PORT = 8396
+MY_PORT = 8395
+# 8395 8399
 # set up the socket for the clients
 
 hostname=socket.gethostname()
@@ -32,7 +33,7 @@ IPAddr=socket.gethostbyname(hostname)
 wellKnownPeerSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 peerSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-peerSocket.bind((HOST, 8396))
+peerSocket.bind((HOST, MY_PORT))
 peerSocket.setblocking(0)
 
 inputs = [peerSocket]
@@ -57,7 +58,7 @@ def calcTimeout():
 # Purpose: sends a GOSSIP message to enter, and stay active in the network
 # --------------------------------------------------------------------------
 def gossip():
-	theMessage = json.dumps({"command": "GOSSIP", "host":IPAddr, "port": 8396, "name":"potato", "messageID": str(uuid.uuid4())})
+	theMessage = json.dumps({'command': 'GOSSIP', 'host':IPAddr, 'port': MY_PORT, 'name':'potato', 'messageID': str(uuid.uuid4())})
 	print(theMessage)
 	wellKnownPeerSocket.sendto(theMessage.encode('utf-8'),(WELL_KNOWN_PEERS[0], PEER_NETWORK_PORT)) # udp message	
 	wellKnownPeerSocket.sendto(theMessage.encode('utf-8'),(WELL_KNOWN_PEERS[1], PEER_NETWORK_PORT)) # udp message	
@@ -71,10 +72,12 @@ def gossip():
 def parseMessage(message, heardAt):
 	message = message.decode('utf-8') ## note message[2] has the address of the sender
 	message = json.loads(message)
-
+#	print(message)
 	# ignore invalid messages (all valid messages have a command key)
 	if("command" in message):
-		if(message["command"] == "GOSSIP_REPLY"):
+		if(message["command"] == "GOSSIP" or  message['command'] == 'GOSSIP'):
+			print(message)
+		if(message["command"] == "GOSSIP_REPLY" or  message['command'] == 'GOSSIP_REPLY'):
 			gossipReplyHeard(message, heardAt)
 
 # --------------------------------------------------------------------------
@@ -85,12 +88,13 @@ def parseMessage(message, heardAt):
 # Parameter: the message, time it was recieved
 # --------------------------------------------------------------------------
 def gossipReplyHeard(message, heardAt):
-	print(message)
-	print(heardAt)
-
 	if(("host" in message) and ("port" in message) and ("name" in message)):
 		# the message is valid
-		myPeers.append(Peer(message["host"],message["port"],message["name"]))
+		tempPeer = Peer(message["host"],message["port"],message["name"],heardAt)
+		
+		for aPeer in myPeers:
+			if(aPeer != tempPeer):
+				myPeers.append(tempPeer)
 
 def printAllPeers():
 	for aPeer in myPeers:
@@ -111,16 +115,16 @@ def main():
 					if(data):
 						parseMessage(data, time.time())
 			
-				for s in exceptions:
-					print('closing socket for '+s.getpeername()+' due to an exception.')
-					s.close()
+			for s in exceptions:
+				print('closing socket for '+s.getpeername()+' due to an exception.')
+				s.close()
 
 			if not (readable or writable or exceptional):
+				print('------------------------------------------')
 				# timed out, so gossip
 				gossip()
 				continue 
 		
-			printAllPeers()
 		except KeyboardInterrupt as e:
 			print("End of processing.")
 			sys.exit(0)
