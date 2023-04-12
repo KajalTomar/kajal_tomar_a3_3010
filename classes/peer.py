@@ -4,11 +4,11 @@ class Peer:
 	lastWord = "";
 
 	# constructor 
-	def __init__(self, host, port, name, lastHeardAt):
+	def __init__(self, host, port, name, lastGossipTime):
 		self.host = host
 		self.port  = port
 		self.name = name
-		self.lastHeard = lastHeardAt
+		self.lastGossipTime = lastGossipTime
 
 	# so I can print the peer's information
 	def __str__(self):

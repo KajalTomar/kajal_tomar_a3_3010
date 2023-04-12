@@ -26,11 +26,11 @@ WORD_SIZE = 5;
 HOST = ""
 WELL_KNOWN_PEERS = ['silicon.cs.umanitoba.ca','eagle.cs.umanitoba.ca','hawk.cs.umanitoba.ca','osprey.cs.umanitoba.ca'];
 PEER_NETWORK_PORT = 16000
-MY_PORT = 8396
-MY_NAME = 'potato'
+MY_PORT = 8397
+MY_NAME = 'RGDFGLKDJFGLKDGJRE'
 # 8395 8399
 # set up the socket for the clients
-WHITELISTED_PEERS = [('130.179.28.119',16000),('130.179.28.126',16000),('130.179.28.37',16000),('130.179.28.113',16000),(MY_NAME, MY_PORT)]
+WHITELISTED_PEERS = [('130.179.28.119',16000),('130.179.28.126',16000),('130.179.28.37',16000),('130.179.28.113',16000)]
 hostname=socket.gethostname()
 MY_HOST=socket.gethostbyname(hostname)
 
@@ -89,7 +89,8 @@ def parseMessage(data, heardAt):
 			message = data[0].decode('utf-8') ## note message[2] has the address of the sender
 			message = json.loads(data[0])
 			#print(message)
-			if(data[1] in WHITELISTED_PEERS):		 # delete before handin
+#if(data[1] in WHITELISTED_PEERS):		 # delete before handin
+			if(1==1):		 # delete before handin
 				# ignore invalid messages (all valid messages have a command key)
 				if("command" in message):
 					if((message["command"] == "GOSSIP") and ("host" in message) and ("port" in message) and ("name" in message) and ("messageID" in message)):
@@ -109,7 +110,7 @@ def parseMessage(data, heardAt):
 # Parameter: the message, time it was recieved
 # --------------------------------------------------------------------------
 def gossipReplyHeard(message, heardAt):
-	print(message)
+#print(message)
 	addIfNewPeer(message, heardAt)
 
 
@@ -160,7 +161,7 @@ def gossipHeard(message, heardAt):
 # Parameter: the message
 # --------------------------------------------------------------------------
 def setHeard(message):
-#	print(message)
+#print(message)
 	i = message["index"]
 	val = message["value"]
 	
@@ -176,12 +177,12 @@ def setHeard(message):
 # Parameter: the message
 # --------------------------------------------------------------------------
 def addIfNewPeer(message, heardAt):
-#print('new peer')
 	newPeer = 1;
 	if(("host" in message) and ("port" in message) and ("name" in message)):
 		# the message is valid
 		tempPeer = Peer(message["host"],message["port"],message["name"],heardAt)
-		if(not(tempPeer.name == MY_NAME and tempPeer.host == MY_HOST and tempPeer.port == MY_PORT)):
+		
+		if(tempPeer.name != MY_NAME and tempPeer.host != MY_HOST and tempPeer.port != MY_PORT):
 			if(len(myPeers) == 0):
 				myPeers.append(tempPeer)
 			else:
@@ -192,7 +193,7 @@ def addIfNewPeer(message, heardAt):
 				if(newPeer == 1):
 					myPeers.append(tempPeer)
 		
-		printAllPeers()
+	#		printAllPeers()
 
 # --------------------------------------------------------------------------
 # removePeers()
@@ -206,10 +207,9 @@ def removePeers():
 			toErase.append(i)
 
 	for i in toErase:
-		print('> deleting '+ myPeers[i].name)
+#print('> deleting '+ myPeer[i].name)
 		del myPeers[i]
-	
-	printAllPeers()
+
 
 # --------------------------------------------------------------------------
 # printAllWords()
@@ -253,7 +253,7 @@ def main():
 			lastSelectTime = time.time()
 	
 			for s in readable:
-				gossip()
+#	gossip()
 				
 				if s is peerSocket:
 					# check the socket for the peers and handle the messages
