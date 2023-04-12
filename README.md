@@ -6,6 +6,7 @@
 1. Start in the assignment directory (kajal_tomar_a3_3010)
 2. Run one of the following commands:
 	`python3 a3_server.py`
+	
 	`python3 a3_server.py 16000`
 3. Press **ctrl + z** to stop running this program.  
 
