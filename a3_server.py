@@ -3,9 +3,7 @@
 # STUDENT NUMBER	: 7793306
 # COURSE		    : COMP 3010
 # INSTRUCTOR	    : Robert Guderian
-# ASSIGNMENT	    : Assignment 3
-#
-# REMARKS:  
+# ASSIGNMENT	    : Assignment 3 
 # --------------------------------------------------------------------
 
 import sys
@@ -29,30 +27,41 @@ LIE_WORD = 'TRUTH'
 HOST = ""
 WELL_KNOWN_PEERS = ['silicon.cs.umanitoba.ca','eagle.cs.umanitoba.ca','hawk.cs.umanitoba.ca','osprey.cs.umanitoba.ca'];
 PEER_NETWORK_PORT = 16000
-MY_PORT = 8396
+CLIENT_PORT = 8398
+MY_PORT = 8399
 MY_NAME = 'potato'
 # 8395 8399
 # set up the socket for the clients
 WHITELISTED_PEERS = [('130.179.28.119',16000),('130.179.28.126',16000),('130.179.28.37',16000),('130.179.28.113',16000),(MY_NAME, MY_PORT)]
+MY_HOSTNAME = ''
 hostname=socket.gethostname()
 MY_HOST=socket.gethostbyname(hostname)
 
 wellKnownPeerSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
 peerSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 peerSocket.bind((HOST, MY_PORT))
 peerSocket.setblocking(0)
 
-inputs = [peerSocket]
+
+clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+clientSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+clientSocket.bind((HOST, CLIENT_PORT))
+clientSocket.setblocking(0);
+clientSocket.listen()
+
+inputs = [clientSocket, peerSocket]
 outputs = []
 exceptions = []
 
 myPeers = []
+myClients = []
+
 myConsensus = []
 allDue = []
 allMessages = [] # messageIDs of all messages ever heard
 theWords = ['one','two','three','four','five'] #random inital words
 lieMode = False
-
 
 theAnnouncement = json.dumps({'command': 'GOSSIP', 'host':MY_HOST, 'port': MY_PORT, 'name':MY_NAME, 'messageID': str(uuid.uuid4())})
 lastGossipTime = 0;
@@ -82,7 +91,7 @@ def gossip():
 		lastGossipTime = currentTime
 		for aPeer in WELL_KNOWN_PEERS:
 			wellKnownPeerSocket.sendto(theAnnouncement.encode('utf-8'),(aPeer, PEER_NETWORK_PORT)) # udp message	
-		print(theAnnouncement)
+	print(theAnnouncement)
 
 # --------------------------------------------------------------------------
 # parseMessage(message)
@@ -95,7 +104,7 @@ def parseMessage(data, heardAt):
 		if(data):
 			message = data[0].decode('utf-8') ## note message[2] has the address of the sender
 			message = json.loads(data[0])
-#print(message)
+		#print(message)
 #if(data[1] in WHITELISTED_PEERS):		 # delete before handin
 				# ignore invalid messages (all valid messages have a command key)
 			if("command" in message):
@@ -125,10 +134,10 @@ def gossipReplyHeard(message, heardAt):
 
 
 # --------------------------------------------------------------------------
-# gossipReplyHeard()
+# gossipHeard()
 #
-# Purpose: a peer sent a gossip_reply. If they aren't in the peer list,
-#	then add them to it
+# Purpose: a peer sent a gossip. If they aren't in the peer list,
+#	then add them to it. Also send a gossip reply
 # Parameter: the message, time it was recieved
 # --------------------------------------------------------------------------
 def gossipHeard(message, heardAt):
@@ -182,7 +191,7 @@ def setHeard(message):
 	if(i >= 0 and i < WORD_SIZE and val):
 		theWords[i] = val
 	
-	#printAllWords()
+	printAllWords()
 
 # --------------------------------------------------------------------------
 # consensusHeard(message)
@@ -199,7 +208,7 @@ def consensusHeard(message, msgFrom,  heardAt):
 	print(message["value"])
 	
 	try:
-		if(message["OM"] == 0):
+		if(message["OM"] == 0): #OM 0 conensus, so reply immediately
 			if(lieMode):
 				sendValue = 'TRUTH'
 			else:
@@ -214,7 +223,8 @@ def consensusHeard(message, msgFrom,  heardAt):
 			print(theMessage)
 			print("------------------------------------------")
 			peerSocket.sendto(theMessage.encode('utf-8'),(msgFrom[0], int(msgFrom[1]))) # udp message
-		elif(message["OM"] > 0):
+		
+		elif(message["OM"] > 0): # OM > 0, start a sub conocensus 
 		
 			newOM = message["OM"] - 1
 			peerList = message["peers"]
@@ -227,9 +237,9 @@ def consensusHeard(message, msgFrom,  heardAt):
 			if(newDue <= 0):
 				newDue = 0.5
 			newConsensus = Consensus(newOM, message["index"], message["value"], peerList, newID, newDue, message["messageID"], msgFrom)
-			print("------------------------------------------")
-			print(newConsensus)
-			print("------------------------------------------")
+#			print("------------------------------------------")
+#			print(newConsensus)
+#			print("------------------------------------------")
 	
 			 
 			for peer in peerList:
@@ -242,10 +252,7 @@ def consensusHeard(message, msgFrom,  heardAt):
 			allDue.append({ "due":float(message["due"]), "dueID": message["messageID"]})
 			
 	except Exception as e:
-		print(e)
-		traceback.print_exc()
-		exit(0)
-
+		pass
 
 # --------------------------------------------------------------------------
 # consensusHeard(message)
@@ -255,19 +262,22 @@ def consensusHeard(message, msgFrom,  heardAt):
 # --------------------------------------------------------------------------
 def consensusReplyHeard(message):
 	global myConsensus
-	print(message)
+#print(message)
 	try:
 		for consensus in myConsensus:
 			if (consensus.messageID == message["reply-to"] and consensus.due >= time.time()):
 				# the the message hasn't already timed out and removed
 				# then update that one of the people responded
 				consensus.gotResponse(message["value"])
+				
+				# Send reply immediately if all members reply
 				if(everyoneReplied()):
 					sendConsensusReply(consensus)
 	except Exception as e:
-		print(e)
-		traceback.print_exc()
-		exit(0)
+		pass
+		#print(e)
+		#traceback.print_exc()
+		#exit(0)
 	
 # --------------------------------------------------------------------------
 # sendConsensusReply(consensus)
@@ -281,8 +291,10 @@ def sendConsensusReply(consensus):
 		if(lieMode):
 			sendValue = LIE_WORD
 		else:
+		 	# Consensus is calculated with majority
 		 	sendValue = consensus.mostHeard()
-
+		 	theWords[0] = sendValue
+		
 		theMessage = json.dumps({"command":"CONSENSUS-REPLY",
 				"value": sendValue,
 				"reply-to": consensus.ogMessageID
@@ -301,9 +313,45 @@ def sendConsensusReply(consensus):
 			del allDue[index]
 
 	except Exception as e:
-		print(e)
-		traceback.print_exc()
-		exit(0)
+		pass
+		#print(e)
+		#traceback.print_exc()
+		#exit(0)
+
+# --------------------------------------------------------------------------
+# parseClientMessage(message)
+#
+# Purpose: parse the message sent by a peer in the network
+# Parameter: the message
+# --------------------------------------------------------------------------
+def parseClientMessage(data, s):
+	global lieMode
+
+	try:
+		if(data):
+			data = data.decode('utf-8')
+			command = ((data.splitlines())[0]).strip()
+			print('> '+command)
+			if(command == 'TRUTH' or  command == "truth"):
+				lieMode = False
+				s.send(('> TELLING THE TRUTH\n').encode('utf-8','ignore'))
+			if(command == 'LIE' or  command == "lie"):
+				lieMode = True
+				s.send(('> NOW LYING\n').encode('utf-8','ignore'))
+			if(command == 'CURRENT' or  command == "current"):
+				s.send(('> '+', '.join(theWords)+'\n').encode('utf-8', 'ignore'))
+			if(command == 'EXIT' or  command == "exit"):	
+				s.send(('> End of Processing.\n').encode('utf-8','ignore'))
+				s.close()
+				if s in myClients:
+					myClients.remove(s)
+			else:
+				s.send(('AVAILABLE COMMANDS:\n- LIE: begin lying\n- TRUTH: stop lying\n- EXIT: close the command-line interface\n- CURRENT: get the current word list\n\n').encode('utf-8','ignore'))
+				
+	except Exception as e:
+		#print(e)
+		#traceback.print_exc()
+		pass;
 
 # --------------------------------------------------------------------------
 # addIfNewPeer()
@@ -374,7 +422,7 @@ def printAllPeers():
 # --------------------------------------------------------------------------
 def handleDeadline(deadline):
 	global myConsensus
-	print('>>>>>>>>>>>>>>>>>>>>>>> HANDELING DEADLINE')
+#print('>>>>>>>>>>>>>>>>>>>>>>> HANDELING DEADLINE')
 	if(deadline["dueID"] == "GOSSIP"):
 		gossip()
 	else:
@@ -386,7 +434,8 @@ def handleDeadline(deadline):
 # --------------------------------------------------------------------------
 # calculateDeadline()
 #
-# Purpose: calculate the closest deadline
+# Purpose: calculate the closest deadlinei. 
+# 			Select timeout is calculated from the various due dates tracked by state
 # --------------------------------------------------------------------------
 def calculateDeadline():
 	global allDue
@@ -428,7 +477,7 @@ def main():
 	while True:
 		
 		try:
-			readable, writable, exceptional = select.select(inputs, outputs, inputs, timeout)
+			readable, writable, exceptional = select.select(inputs + myClients, outputs, inputs, timeout)
 			
 			lastSelectTime = time.time()
 	
@@ -440,17 +489,18 @@ def main():
 					data = s.recvfrom(1024)
 					if(data):
 						parseMessage(data, time.time())
-				else:
-					print('some other type of socket---------------------------------------')
-					# check the socket for the peers and handle the messages
-					data = s.recvfrom(1024)
+				if s is clientSocket:
+					# Monitor is TCP connected, functions. Multiple can be connected.
+					connection, clientAddr = clientSocket.accept()
+					connection.setblocking(0)
+					myClients.append(connection)
+				elif s in myClients:
+					data = s.recv(1024)
 					if(data):
-						parseMessage(data, time.time())
-
-			if ((not (readable or writable or exceptional)) or (time.time() >= deadline["due"])):
+						parseClientMessage(data, s)
 				handleDeadline(deadline);
 				# timed out, so gossip
-				print('1:*********************TIMEOUT***********************');
+				#print('1:*********************TIMEOUT***********************');
 				
 				if len(allMessages) > 120:
 				    myList = allMessages[:100]
@@ -466,8 +516,9 @@ def main():
 			sys.exit(0)
 		except Exception as e:
 			print(e)
-			traceback.print_exc()
+			#traceback.print_exc()
 			print("End of processing.")
 			peerSocket.close()
+			clientSocket.close()
 			sys.exit(0)
 main();
