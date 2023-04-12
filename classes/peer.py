@@ -1,7 +1,8 @@
 import json
 
 class Peer:
-	
+	lastWord = "";
+
 	# constructor 
 	def __init__(self, host, port, name, lastHeardAt):
 		self.host = host
@@ -21,4 +22,11 @@ class Peer:
 			return True
 		else:
 			return False
+
 	
+	def setLastWord(word):
+		if(word):
+			lastWord = word 
+
+	def getLastWord(): 
+		return lastWord
