@@ -1,13 +1,3 @@
-# --------------------------------------------------------------------
-# NAME		        : Kajal Tomar
-# STUDENT NUMBER	: 7793306
-# COURSE		    : COMP 3010
-# INSTRUCTOR	    : Robert Guderian
-# ASSIGNMENT	    : Assignment 3
-#
-# REMARKS:  
-# --------------------------------------------------------------------
-
 import sys
 import select
 import json
